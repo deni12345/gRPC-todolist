@@ -4,6 +4,7 @@ package gen
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -22,7 +23,7 @@ type ToDoServiceClient interface {
 	Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error)
 	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
-	ReadAll(ctx context.Context, in *ReadAllRequest, opts ...grpc.CallOption) (*ReadAllResponse, error)
+	ReadAll(ctx context.Context, in *ReadAllRequest, opts ...grpc.CallOption) (ToDoService_ReadAllClient, error)
 }
 
 type toDoServiceClient struct {
@@ -69,13 +70,36 @@ func (c *toDoServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts 
 	return out, nil
 }
 
-func (c *toDoServiceClient) ReadAll(ctx context.Context, in *ReadAllRequest, opts ...grpc.CallOption) (*ReadAllResponse, error) {
-	out := new(ReadAllResponse)
-	err := c.cc.Invoke(ctx, "/todo.ToDoService/ReadAll", in, out, opts...)
+func (c *toDoServiceClient) ReadAll(ctx context.Context, in *ReadAllRequest, opts ...grpc.CallOption) (ToDoService_ReadAllClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ToDoService_ServiceDesc.Streams[0], "/todo.ToDoService/ReadAll", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &toDoServiceReadAllClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ToDoService_ReadAllClient interface {
+	Recv() (*ReadAllResponse, error)
+	grpc.ClientStream
+}
+
+type toDoServiceReadAllClient struct {
+	grpc.ClientStream
+}
+
+func (x *toDoServiceReadAllClient) Recv() (*ReadAllResponse, error) {
+	m := new(ReadAllResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // ToDoServiceServer is the server API for ToDoService service.
@@ -86,28 +110,31 @@ type ToDoServiceServer interface {
 	Read(context.Context, *ReadRequest) (*ReadResponse, error)
 	Update(context.Context, *UpdateRequest) (*UpdateResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
-	ReadAll(context.Context, *ReadAllRequest) (*ReadAllResponse, error)
+	ReadAll(*ReadAllRequest, ToDoService_ReadAllServer) error
 	mustEmbedUnimplementedToDoServiceServer()
 }
 
 // UnimplementedToDoServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedToDoServiceServer struct {
-}
+type UnimplementedToDoServiceServer struct{}
 
 func (UnimplementedToDoServiceServer) Create(context.Context, *CreateRequest) (*CreateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
 }
+
 func (UnimplementedToDoServiceServer) Read(context.Context, *ReadRequest) (*ReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
 }
+
 func (UnimplementedToDoServiceServer) Update(context.Context, *UpdateRequest) (*UpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
+
 func (UnimplementedToDoServiceServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
-func (UnimplementedToDoServiceServer) ReadAll(context.Context, *ReadAllRequest) (*ReadAllResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReadAll not implemented")
+
+func (UnimplementedToDoServiceServer) ReadAll(*ReadAllRequest, ToDoService_ReadAllServer) error {
+	return status.Errorf(codes.Unimplemented, "method ReadAll not implemented")
 }
 func (UnimplementedToDoServiceServer) mustEmbedUnimplementedToDoServiceServer() {}
 
@@ -194,22 +221,25 @@ func _ToDoService_Delete_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ToDoService_ReadAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadAllRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _ToDoService_ReadAll_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ReadAllRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(ToDoServiceServer).ReadAll(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/todo.ToDoService/ReadAll",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ToDoServiceServer).ReadAll(ctx, req.(*ReadAllRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(ToDoServiceServer).ReadAll(m, &toDoServiceReadAllServer{stream})
+}
+
+type ToDoService_ReadAllServer interface {
+	Send(*ReadAllResponse) error
+	grpc.ServerStream
+}
+
+type toDoServiceReadAllServer struct {
+	grpc.ServerStream
+}
+
+func (x *toDoServiceReadAllServer) Send(m *ReadAllResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 // ToDoService_ServiceDesc is the grpc.ServiceDesc for ToDoService service.
@@ -235,11 +265,13 @@ var ToDoService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Delete",
 			Handler:    _ToDoService_Delete_Handler,
 		},
+	},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "ReadAll",
-			Handler:    _ToDoService_ReadAll_Handler,
+			StreamName:    "ReadAll",
+			Handler:       _ToDoService_ReadAll_Handler,
+			ServerStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "todolist/todo.proto",
 }

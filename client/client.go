@@ -5,7 +5,8 @@ import (
 	"io"
 	"log"
 	"time"
-	pb "todo/todolist"
+
+	pb "todo/gen/proto"
 
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
@@ -93,7 +94,7 @@ func main() {
 	t := time.Now().In(time.UTC)
 	insert_at, _ := ptypes.TimestampProto(t)
 
-	id := createToDoItem(client, &pb.CreateRequest{
+	createToDoItem(client, &pb.CreateRequest{
 		Api: "1",
 		ToDo: &pb.ToDo{
 			Title:       "demo task",
@@ -103,24 +104,24 @@ func main() {
 		},
 	})
 
-	ReadToDoItem(client, &pb.ReadRequest{
-		Api: "1",
-		Id:  id,
-	})
+	// ReadToDoItem(client, &pb.ReadRequest{
+	// 	Api: "1",
+	// 	Id:  id,
+	// })
 
-	ReadToDoItems(client, &pb.ReadAllRequest{
-		Api: "1",
-	})
+	// ReadToDoItems(client, &pb.ReadAllRequest{
+	// 	Api: "1",
+	// })
 
-	updateToDoItem(client, &pb.UpdateRequest{
-		Api: "1",
-		ToDo: &pb.ToDo{
-			Id:       id,
-			Title:    "testing update",
-			InsertAt: insert_at,
-			UpdateAt: insert_at,
-		},
-	})
+	// updateToDoItem(client, &pb.UpdateRequest{
+	// 	Api: "1",
+	// 	ToDo: &pb.ToDo{
+	// 		Id:       id,
+	// 		Title:    "testing update",
+	// 		InsertAt: insert_at,
+	// 		UpdateAt: insert_at,
+	// 	},
+	// })
 
 	// deleteToDoItem(client, &pb.DeleteRequest{
 	// 	Api: "1",
